@@ -1,0 +1,357 @@
+-- Survey Table Sample Data # 1
+ SELECT *
+ FROM survey
+ LIMIT 10;
+ 
+ -- Question Response Count # 2
+ SELECT question,
+ COUNT(DISTINCT user_id) AS 'User Count'
+ FROM survey
+ GROUP BY 1;
+ 
+ --Look at Excel File for # 3
+ 
+ --Home Try-On Funnel #4
+ SELECT *
+ FROM quiz
+ LIMIT 5;
+ 
+ SELECT *
+ FROM home_try_on
+ LIMIT 5;
+ 
+ SELECT *
+ FROM purchase
+ LIMIT 5;
+ 
+--New Table # 5
+SELECT DISTINCT q.user_id,
+	h.user_id IS NOT NULL AS 'is_home_try_on',
+	h.number_of_pairs,
+	p.user_id IS NOT NULL AS 'is_purchase'
+FROM quiz AS 'q'
+LEFT JOIN home_try_on AS 'h'
+  	ON q.user_id = h.user_id
+LEFT JOIN purchase AS 'p'
+  	ON h.user_id = p.user_id
+LIMIT 10;
+
+-- Rename True/False
+WITH funnels AS (
+  SELECT DISTINCT q.user_id,
+	h.user_id IS NOT NULL AS 'is_home_try_on',
+	h.number_of_pairs,
+	p.user_id IS NOT NULL AS 'is_purchase'
+FROM quiz AS 'q'
+LEFT JOIN home_try_on AS 'h'
+  	ON q.user_id = h.user_id
+LEFT JOIN purchase AS 'p'
+  	ON h.user_id = p.user_id)
+SELECT user_id,
+CASE
+  WHEN is_home_try_on = 1 THEN 'True'
+	ELSE 'False'
+  END as 'is_home_try_on',
+CASE
+	WHEN number_of_pairs IS NULL THEN 'NULL'
+  ELSE number_of_pairs
+  END AS 'number_of_pairs',
+CASE
+	WHEN is_purchase = 1 THEN 'True'
+  ELSE 'False'
+  END AS 'is_purchase'
+FROM funnels
+LIMIT 10;
+
+--START # 6 STEPS
+--Aggregate Across All Rows
+WITH funnels AS (
+  SELECT DISTINCT q.user_id,
+	h.user_id IS NOT NULL AS 'is_home_try_on',
+  h.number_of_pairs,
+  p.user_id IS NOT NULL AS 'is_purchase'
+FROM quiz AS 'q'
+LEFT JOIN home_try_on AS 'h'
+  	ON q.user_id = h.user_id
+LEFT JOIN purchase AS 'p'
+  	ON h.user_id = p.user_id)
+SELECT COUNT(*) AS 'num_browses',
+	SUM(is_home_try_on) AS 'home_try_ons',
+  SUM(number_of_pairs) AS 'pairs',
+  SUM(is_purchase) AS 'purchases'
+FROM funnels;
+
+--Conversion From Quiz > home_try_on & home_try_on > purchase
+WITH funnels AS (
+  SELECT DISTINCT q.user_id,
+	h.user_id IS NOT NULL AS 'is_home_try_on',
+  h.number_of_pairs,
+  p.user_id IS NOT NULL AS 'is_purchase'
+FROM quiz AS 'q'
+LEFT JOIN home_try_on AS 'h'
+  	ON q.user_id = h.user_id
+LEFT JOIN purchase AS 'p'
+  	ON h.user_id = p.user_id)
+SELECT COUNT(*) AS 'num_browses',
+	SUM(is_home_try_on) AS 'home_try_ons',
+  SUM(is_purchase) AS 'purchases',
+  1.0 * SUM(is_home_try_on) / COUNT(*) AS 'quiz_to_home_try_on',
+  1.0 * SUM(is_purchase) / SUM(is_home_try_on) AS 'home_try_on_to_purchase',
+  1.0 * SUM(is_purchase) / COUNT (*) AS 'quiz_to_purchase'
+FROM funnels;
+
+--Purchase Rate between 3 & 5 pairs - ONLY PURCHASES
+WITH funnels AS (
+  SELECT DISTINCT q.user_id,
+	h.user_id IS NOT NULL AS 'is_home_try_on',
+  h.number_of_pairs,
+  p.user_id IS NOT NULL AS 'is_purchase'
+FROM quiz AS 'q'
+LEFT JOIN home_try_on AS 'h'
+  	ON q.user_id = h.user_id
+LEFT JOIN purchase AS 'p'
+  	ON h.user_id = p.user_id)
+SELECT SUM(is_purchase) AS 'purchases',
+		COUNT(DISTINCT CASE
+    WHEN number_of_pairs = '3 pairs' THEN user_id
+   	END) AS '3P',
+    ROUND(1.0 * COUNT(DISTINCT CASE
+    WHEN number_of_pairs = '3 pairs' THEN user_id
+   	END) / SUM(is_purchase), 2) AS '3P %',
+    COUNT(DISTINCT CASE
+    WHEN number_of_pairs = '5 pairs' THEN user_id
+   	END) AS '5P',
+    ROUND(1.0 * COUNT(DISTINCT CASE
+    WHEN number_of_pairs = '5 pairs' THEN user_id
+   	END) / SUM(is_purchase), 2) AS '5P %'
+FROM funnels
+WHERE is_purchase <> 0;
+
+--Start Quiz Table Analysis
+
+--Top Overall Responses
+SELECT fit, COUNT(user_id) AS 'COUNT'
+FROM quiz
+GROUP BY 1
+ORDER BY 2 DESC;
+
+SELECT shape, COUNT(user_id) AS 'COUNT'
+FROM quiz
+GROUP BY 1
+ORDER BY 2 DESC;
+
+SELECT color, COUNT(color) AS 'COUNT'
+FROM quiz
+GROUP BY 1
+ORDER BY 2 DESC;
+
+--TOP COMBINATIONS
+--MEN'S COUNT - TOP 5
+SELECT fit, shape, color, 
+COUNT(CASE 
+     WHEN style LIKE 'Men%' THEN user_id
+     END) AS 'Mens Count'
+FROM quiz
+GROUP BY 1, 2, 3
+ORDER BY 4 DESC
+LIMIT 5;
+
+--WOMEN'S COUNT - TOP 5
+SELECT fit, shape, color, 
+COUNT(CASE 
+     WHEN style LIKE 'Wo%' THEN user_id
+     END) AS 'Womens Count'
+FROM quiz
+GROUP BY 1, 2, 3
+ORDER BY 4 DESC
+LIMIT 5;
+
+--UNSURE/UNISEX COUNT - TOP 5
+SELECT fit, shape, color, 
+COUNT(CASE 
+     WHEN style LIKE '%not%' THEN user_id
+     END) AS 'Unsure Count'
+FROM quiz
+GROUP BY 1, 2, 3
+ORDER BY 4 DESC
+LIMIT 5;
+
+--TOTAL COUNT BY STYLE & FIT
+SELECT fit,
+COUNT(CASE 
+     WHEN style LIKE 'Men%' THEN user_id
+     END) AS 'Mens Count',
+COUNT(CASE
+     WHEN style LIKE '%Wome%' THEN user_id
+     END) AS 'Womens Count',
+COUNT(CASE
+     WHEN style LIKE '%sure%' THEN user_id
+      END) AS 'Unsure/Unisex Count'
+FROM quiz
+GROUP BY 1
+ORDER BY 2 DESC, 3 DESC, 4 DESC;
+
+--TOTAL COUNT BY STYLE & SHAPE
+SELECT shape,
+COUNT(CASE 
+     WHEN style LIKE 'Men%' THEN user_id
+     END) AS 'Mens Count',
+COUNT(CASE
+     WHEN style LIKE '%Wome%' THEN user_id
+     END) AS 'Womens Count',
+COUNT(CASE
+     WHEN style LIKE '%sure%' THEN user_id
+      END) AS 'Unsure/Unisex Count'
+FROM quiz
+GROUP BY 1
+ORDER BY 2 DESC, 3 DESC, 4 DESC;
+
+--TOTAL COUNT BY STYLE & COLOR
+SELECT color,
+COUNT(CASE 
+     WHEN style LIKE 'Men%' THEN user_id
+     END) AS 'Mens Count',
+COUNT(CASE
+     WHEN style LIKE '%Wome%' THEN user_id
+     END) AS 'Womens Count',
+COUNT(CASE
+     WHEN style LIKE '%sure%' THEN user_id
+      END) AS 'Unsure/Unisex Count'
+FROM quiz
+GROUP BY 1
+ORDER BY 2 DESC, 3 DESC, 4 DESC;
+
+--COUNTS BY STYLE/SHAPE COMBO
+SELECT style,
+COUNT(CASE
+ WHEN shape = 'Rectangular'
+			AND fit = 'Narrow' THEN user_id
+	END) AS 'Narrow/Rectangular',
+COUNT(CASE
+    WHEN shape = 'Rectangular'
+			AND fit = 'Medium' THEN user_id
+	END) AS 'Medium/Rectangular',
+COUNT(CASE
+    WHEN shape = 'Rectangular'
+			AND fit = 'Wide' THEN user_id
+	END) AS 'Wide/Rectangular',
+ COUNT(CASE
+ WHEN shape = 'Round'
+			AND fit = 'Narrow' THEN user_id
+	END) AS 'Narrow/Round',
+COUNT(CASE
+    WHEN shape = 'Round'
+			AND fit = 'Medium' THEN user_id
+	END) AS 'Medium/Round',
+COUNT(CASE
+    WHEN shape = 'Round'
+			AND fit = 'Wide' THEN user_id
+	END) AS 'Wide/Round',
+COUNT(CASE
+ WHEN shape = 'Square'
+			AND fit = 'Narrow' THEN user_id
+	END) AS 'Narrow/Square',
+COUNT(CASE
+    WHEN shape = 'Square'
+			AND fit = 'Medium' THEN user_id
+	END) AS 'Medium/Square',
+COUNT(CASE
+    WHEN shape = 'Square'
+			AND fit = 'Wide' THEN user_id
+	END) AS 'Wide/Square'
+FROM quiz
+WHERE style NOT LIKE '%not sure%'
+GROUP BY 1
+ORDER BY 1 DESC;
+
+--BOTTOM 20 COMBINATIONS - REMOVING UNSURE RESPONSES
+SELECT fit, shape, color, COUNT(user_id)
+FROM quiz
+WHERE fit NOT LIKE '%sure%'
+	AND style NOT LIKE '%sure%'
+	AND shape NOT LIKE 'No Preference'
+GROUP BY 1, 2, 3
+ORDER BY 4
+LIMIT 20;
+
+--Looking only by color
+SELECT color, COUNT(color) AS 'COUNT'
+FROM quiz
+WHERE fit LIKE '%not%'
+	AND shape LIKE '%no%'
+GROUP BY 1;
+
+--Looking only by shape
+SELECT shape, COUNT(shape) AS 'COUNT'
+FROM quiz
+WHERE fit LIKE '%not%'
+	AND shape NOT LIKE 'No%'
+GROUP BY 1
+ORDER BY 2 DESC;
+
+--Start Purchase Table Analysis
+SELECT *
+FROM purchase
+LIMIT 10;
+
+--Product Listing
+SELECT DISTINCT product_id, style, model_name, color, price
+FROM purchase
+ORDER BY 1;
+
+--Rounded Average Price
+SELECT ROUND(AVG(price), 2) AS 'AVG PRICE'
+FROM purchase;
+
+--Min & Max Price
+SELECT MAX(price),
+MIN(price)
+FROM purchase;
+
+--Rounded Sum of all Prices = Total Sales
+SELECT ROUND(SUM(price), 2) AS 'Total Sales', COUNT(user_id) AS 'Total Purchases'
+FROM purchase;
+
+--Total Sales by Style
+SELECT style, COUNT(*) AS 'Total Purchased', SUM(price) AS 'Total Sales'
+from purchase
+GROUP BY 1
+ORDER BY 2 DESC;
+
+--Most common Color Purchased
+SELECT color, COUNT(user_id) AS 'Color Count'
+FROM purchase
+GROUP BY 1
+ORDER BY 2 DESC;
+
+--Most common Style purchased
+SELECT style, COUNT(style) AS 'Style Count'
+FROM purchase
+GROUP BY 1
+ORDER BY 2 DESC;
+
+--Most common Model Purchased
+SELECT model_name, COUNT(user_id) AS 'Model Count'
+FROM purchase
+GROUP BY 1
+ORDER BY 2 DESC;
+
+--Most Common Product Sold
+SELECT style, product_id, COUNT(*) AS 'Total Purchased', price, SUM(price) AS 'Total'
+FROM purchase
+WHERE style LIKE 'Men%'
+GROUP BY 2
+ORDER BY 3 DESC;
+
+SELECT style, product_id, COUNT(*) AS 'Total Purchased', price, SUM(price) AS 'Total Sales'
+FROM purchase
+WHERE style LIKE 'Women%'
+GROUP BY 2
+ORDER BY 3 DESC;
+
+SELECT style, product_id, COUNT(*) AS 'Total Purchased', price, SUM(price) AS 'Total Sales'
+FROM purchase
+GROUP BY 2
+ORDER BY 3 DESC;
+
+
